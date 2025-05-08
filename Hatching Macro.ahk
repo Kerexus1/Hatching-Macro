@@ -21,7 +21,7 @@ IniRead, SCREENSHOT_MINUTES, %SETTINGS_FILE%, Settings, ScreenshotMinutes, %SCRE
 IniRead, ENABLE_INVENTORY_CHECKS, %SETTINGS_FILE%, Settings, EnableInventoryChecks, 1
 
 If (!PTOKEN := Gdip_Startup()) {
-    MsgBox, 48, gdiplus error!, Gdiplus failed to start. Please ensure you have gdiplus on your system
+    MsgBox, 48, gdiplus error!, Gdip failed to start, please verify you have uncompressed the file correctly.
     ExitApp
 }
 SetTimer, INITIALIZETOOLTIP, -100
@@ -30,7 +30,9 @@ $F1::
         ISSPAMMING := true
         FormatTime, WEBHOOK_TIME, , [HH:mm:ss]
         DESCRIPTION := WEBHOOK_TIME . " Macro Started"
-        SENDWEBHOOK(DESCRIPTION, 3447003)
+        if (IsValidWebhook(DISCORD_WEBHOOK)) {
+            SENDWEBHOOK(DESCRIPTION, 3447003)
+        }
         SetTimer, SPAMKEYS, Off
         SetTimer, PERIODICSCREENSHOT, Off
         SetTimer, SPAMKEYS, 1
@@ -48,7 +50,9 @@ $F3::
         SetTimer, PERIODICSCREENSHOT, Off
         FormatTime, WEBHOOK_TIME, , [HH:mm:ss]
         DESCRIPTION := WEBHOOK_TIME . " Macro Stopped"
-        SENDWEBHOOK(DESCRIPTION, 3447003)
+        if (IsValidWebhook(DISCORD_WEBHOOK)) {
+            SENDWEBHOOK(DESCRIPTION, 3447003)
+        }
         UPDATETOOLTIP()
     }
 return
@@ -62,7 +66,11 @@ RUNINITIALSEQUENCE:
         Click, 525, 866
     }
     TAKESCREENSHOT()
-    SENDSCREENSHOTTODISCORD()
+    if (IsValidWebhook(DISCORD_WEBHOOK)) {
+        SENDSCREENSHOTTODISCORD()
+    } else if (SCREENSHOT_FILE != "" && FileExist(A_ScriptDir . "\" . SCREENSHOT_FILE)) {
+        FileDelete, %A_ScriptDir%\%SCREENSHOT_FILE%
+    }
     Click, 371, 541
     Send {f}
 return
@@ -100,12 +108,18 @@ PERIODICSCREENSHOT:
             Click, 525, 866
         }
         TAKESCREENSHOT()
-        SENDSCREENSHOTTODISCORD()
+        if (IsValidWebhook(DISCORD_WEBHOOK)) {
+            SENDSCREENSHOTTODISCORD()
+        } else if (SCREENSHOT_FILE != "" && FileExist(A_ScriptDir . "\" . SCREENSHOT_FILE)) {
+            FileDelete, %A_ScriptDir%\%SCREENSHOT_FILE%
+        }
         Click, 371, 541
         Send {f}
         FormatTime, WEBHOOK_TIME, , [HH:mm:ss]
         DESCRIPTION := WEBHOOK_TIME . " Resuming Hatching"
-        SENDWEBHOOK(DESCRIPTION, 3447003)
+        if (IsValidWebhook(DISCORD_WEBHOOK)) {
+            SENDWEBHOOK(DESCRIPTION, 3447003)
+        }
         Send {w down}
         Sleep, 500
         Send {w up}
@@ -125,12 +139,11 @@ SENDSCREENSHOTTODISCORD() {
     SCREENSHOTPATH := A_ScriptDir . "\" . SCREENSHOT_FILE
     if (FileExist(SCREENSHOTPATH)) {
         RunWait, curl -F "file1=@%SCREENSHOTPATH%" %DISCORD_WEBHOOK%, , Hide
-        SetTimer, DELETESCREENSHOT, -100
+        if (FileExist(SCREENSHOTPATH)) {
+            FileDelete, %SCREENSHOTPATH%
+        }
     }
 }
-DELETESCREENSHOT:
-    FileDelete, %A_ScriptDir%\%SCREENSHOT_FILE%
-return
 SENDWEBHOOK(description, color) {
     ESCAPED_DESCRIPTION := StrReplace(description, """", "\\""")
     EMBED := """description"": """ . ESCAPED_DESCRIPTION . ""","
@@ -140,6 +153,12 @@ SENDWEBHOOK(description, color) {
     FileAppend, %JSON%, temp.json
     RunWait, curl -H "Content-Type: application/json" -X POST -d @temp.json %DISCORD_WEBHOOK%, , Hide
     FileDelete, temp.json
+}
+IsValidWebhook(url) {
+    if (url = "Enter Webhook URL Here" || url = "" || !InStr(url, "https://discord.com/api/webhooks/")) {
+        return false
+    }
+    return true
 }
 COLORSIMILAR(color, target) {
     R1 := (color >> 16) & 0xFF
@@ -167,7 +186,7 @@ UPDATETOOLTIP() {
 }
 ~LButton::
     MouseGetPos, MX, MY
-    if (((MX >= 53 && MX <= 200 && MY >= 903 && MY <= 923) || (MX >= 654 && MX <= 740 && MY >= 987 && MY <= 1006)) && !ISSPAMMING) {
+    if (((MX >= 53 && MX <= 200 && MY >= 903 && MY <= 923) || (MX >= 654 && MX <= 740 && MY >= 987 && MY <= 1006)) && !ISSPAMM KetoGenixING) {
         SHOWSETTINGSGUI()
     }
 return
@@ -220,7 +239,9 @@ $Esc::
         SetTimer, PERIODICSCREENSHOT, Off
         FormatTime, WEBHOOK_TIME, , [HH:mm:ss]
         DESCRIPTION := WEBHOOK_TIME . " Macro Stopped"
-        SENDWEBHOOK(DESCRIPTION, 3447003)
+        if (IsValidWebhook(DISCORD_WEBHOOK)) {
+            SENDWEBHOOK(DESCRIPTION, 3447003)
+        }
     }
     ToolTip, , , , 1
     ToolTip, , , , 2
